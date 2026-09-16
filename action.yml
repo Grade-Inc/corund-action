@@ -25,8 +25,8 @@
 # Requirements on the calling job: `actions/checkout` with `fetch-depth: 0` (the merge-base must
 # exist), a Python 3.12+ interpreter on PATH, and whatever your test command needs installed.
 # Permissions: `checks: write`, `pull-requests: write`, `contents: read`.
-name: "Corund"
-description: "Require the PR's new tests to fail on the old code. Deterministic red-on-revert with a receipt. Never reports a check it did not run."
+name: "Corund - red-on-revert"
+description: "Require the PR's new tests to fail on the old code. Deterministic red-on-revert with a receipt. Observe by default."
 author: "Grade-Inc"
 branding:
   icon: "check-square"
