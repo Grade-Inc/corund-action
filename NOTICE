@@ -1,0 +1,7 @@
+Corund GitHub Action — Copyright 2026 Grade-Inc. Released under the MIT License (see LICENSE).
+
+This repository is a generated mirror of the `action/` directory and the `corund_checks` package of
+the Corund monorepo, which is proprietary to Grade-Inc; only the files in this repository are
+covered by the MIT License. The mirror is regenerated from the monorepo by its sync tool, and a CI
+check there refuses drift between the two; please open issues here, and expect fixes to land via
+the next sync rather than by direct commits to this tree.

@@ -1,0 +1,113 @@
+# Corund — require the PR's new tests to fail on the old code.
+#
+# Runs C1 red-on-revert against the PR: it reverts the PR's non-test diff onto the base, runs the
+# PR's new/changed tests, and requires at least one to EXECUTE and FAIL BY ASSERTION on the reverted
+# tree, then pass again restored. It posts ONE check run, upserts ONE PR comment carrying the
+# receipt, and uploads the receipt JSON as an artifact.
+#
+# What C1 proves, and what it does not: it proves a test could have failed. It does NOT verify the
+# test asserts the CORRECT value, so a PR whose code and test are wrong in agreement is NOT DECIDED.
+# That residual is printed on every receipt.
+#
+# C1 does not ACCUSE. Its verdicts are PROVEN, UNPROVEN with a named reason, CRASHED, and NOT_RUN.
+# The canonical fake green — a test that is green with the change reverted — is UNPROVEN
+# ("green-on-revert"), not an accusation; a skip is UNPROVEN ("collection").
+#
+# C2 skip-audit is experimental and observe-only: it is not run by this Action in this release, and
+# is available via `corund replay`.
+#
+# Absolute rule: Corund never reports a check it did not run. A check it could not run is posted
+# as NOT_RUN or CRASHED with the reason; an internal crash of this Action concludes every check it
+# owns as CRASHED with the exception's text. Nothing here is ever green by omission.
+#
+# Posture: OBSERVE by default — the check-run conclusion is `neutral`. BLOCK is an opt-in
+# (`block: c1`); only an opted-in rule may conclude `failure`. UNPROVEN never blocks by itself.
+# `block:` naming any id this release does not run is REFUSED with a message, never ignored.
+# Run `corund replay` over your last 50 merged PRs before opting in.
+#
+# Requirements on the calling job: `actions/checkout` with `fetch-depth: 0` (the merge-base must
+# exist), a Python 3.12+ interpreter on PATH, and whatever your test command needs installed.
+# Permissions: `checks: write`, `pull-requests: write`, `contents: read`.
+name: "Corund"
+description: "Require the PR's new tests to fail on the old code. Deterministic red-on-revert with a receipt. Never reports a check it did not run."
+author: "Grade-Inc"
+branding:
+  icon: "check-square"
+  color: "blue"
+
+inputs:
+  test-command:
+    description: "The test runner command; Corund appends the report flag and the changed test files (pytest family: --junitxml; jest/vitest: --json/--reporter=json)."
+    required: false
+    default: "python -m pytest"
+  test-globs:
+    description: "Comma-separated globs that identify test files (everything else is the non-test diff C1 reverts)."
+    required: false
+    default: "tests/**/test_*.py,**/test_*.py,**/*_test.py,**/*.test.js,**/*.test.ts,**/*.test.tsx,**/*.test.jsx,**/*.spec.ts,**/*.spec.js,**/__tests__/**"
+  runner:
+    description: "pytest | jest | vitest | auto (detected from the repo). Other runners are NOT SUPPORTED and report NOT_RUN."
+    required: false
+    default: "auto"
+  skip-allowlist:
+    description: "ACCEPTED AND INERT in this release. The loud-skip allowlist is C2's input, and C2 is not run by this Action here, so this value is not read and selects nothing. The input is kept so an existing workflow does not error on upgrade, and every receipt states that it does nothing."
+    required: false
+    default: "tests/loud_skips.txt"
+  block:
+    description: "Comma list of check ids allowed to conclude failure. This release runs C1 only, so `c1` is the only accepted value; empty = OBSERVE. Any other id (including `c2`) is REFUSED with a message naming it — never accepted and ignored, because a gate the user believes is armed and is not is the exact defect Corund exists to catch."
+    required: false
+    default: ""
+  timeout-minutes:
+    description: "Per test-run timeout for C1 (three runs at most: with, without, rerun)."
+    required: false
+    default: "20"
+  token:
+    description: "Token with checks:write and pull-requests:write. Passed to the entrypoint through the environment, never as an argument."
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  receipt-path:
+    description: "Path of the receipt JSON written by this run."
+    value: ${{ steps.corund.outputs.receipt-path }}
+
+runs:
+  using: "composite"
+  steps:
+    - id: corund
+      shell: bash
+      env:
+        CORUND_GITHUB_TOKEN: ${{ inputs.token }}
+        CORUND_TEST_COMMAND: ${{ inputs.test-command }}
+        CORUND_TEST_GLOBS: ${{ inputs.test-globs }}
+        CORUND_RUNNER: ${{ inputs.runner }}
+        CORUND_SKIP_ALLOWLIST: ${{ inputs.skip-allowlist }}
+        CORUND_BLOCK: ${{ inputs.block }}
+        CORUND_TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
+        CORUND_DETAILS_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        set -uo pipefail
+        out="${RUNNER_TEMP:-/tmp}/corund/corund-receipt.json"
+        mkdir -p "$(dirname "$out")"
+        echo "receipt-path=$out" >> "$GITHUB_OUTPUT"
+        python3 "${{ github.action_path }}/entrypoint.py" run \
+          --repo-dir "$GITHUB_WORKSPACE" \
+          --test-command "$CORUND_TEST_COMMAND" \
+          --test-globs "$CORUND_TEST_GLOBS" \
+          --runner "$CORUND_RUNNER" \
+          --skip-allowlist "$CORUND_SKIP_ALLOWLIST" \
+          --block "$CORUND_BLOCK" \
+          --timeout-minutes "$CORUND_TIMEOUT_MINUTES" \
+          --details-url "$CORUND_DETAILS_URL" \
+          --out "$out"
+        rc=$?
+        echo "corund exit code: $rc (0 = nothing blocked; 1 = a BLOCK-mode rule concluded failure/action_required or posting failed; 2 = the Action itself crashed, which includes a refused `block:` value — see the receipt)"
+        exit $rc
+
+    - name: Upload the receipt
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: corund-receipt
+        path: ${{ steps.corund.outputs.receipt-path }}
+        if-no-files-found: warn
+        retention-days: 30
