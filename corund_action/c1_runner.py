@@ -846,8 +846,8 @@ def run_c1(*, repo_dir: str, base_sha: str, head_sha: str, test_globs: str, fami
     modified_tests = selection.keep(modified_tests)
     all_tests = selection.keep(all_tests)
     selection_note = selection.note()
-    infra_note = (f"; {len(infra)} test-infrastructure file(s) changed and kept at head on every tree (never reverted; "
-                  f"audited by C2): {', '.join(infra)}") if infra else ""
+    infra_note = (f"; {len(infra)} test-infrastructure file(s) changed and kept at head on every tree "
+                  f"(never reverted): {', '.join(infra)}") if infra else ""
     infra_note += "; " + selection_note
     if not test_files:
         # ISSUE #202. The reason must name the REAL cause. "changed no test files matching the globs"
@@ -926,7 +926,7 @@ def run_c1(*, repo_dir: str, base_sha: str, head_sha: str, test_globs: str, fami
                      f"registers plugins or injects flags into every run, and C1 never reverts it, so it would have run on the "
                      f"reverted tree too")
     if infra:
-        notes.append(f"test infrastructure kept at head on every tree (never reverted; audited by C2): {', '.join(infra)}")
+        notes.append(f"test infrastructure kept at head on every tree (never reverted): {', '.join(infra)}")
     notes.append(selection_note)
 
     runs: list[dict] = []

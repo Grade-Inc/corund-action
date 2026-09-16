@@ -36,14 +36,17 @@ NOT_RUN_BY_THE_ACTION: dict[str, str] = {
     "C4": "C4 is not run by the Action in this release",
 }
 
-# ONE line per surface, no more (the owner's wording rule for this release).
-C2_FROZEN_LINE = ("C2 skip-audit is experimental and observe-only: it is not run by the Action in "
-                  "this release, and is available via `corund replay`.")
-# The `skip-allowlist` input is C2's alone. It stays ACCEPTED so that no existing workflow errors on
-# upgrade -- and an input that silently does nothing is a lie, so every run says it does nothing.
+# REMOVED 2026-09-16 (owner, overruling the ship-as-is on #226 for the receipt strings). A standing
+# note naming a frozen check printed on EVERY receipt of EVERY user, advertising a check the same
+# receipt said was not run. The product's own rule is: do not name a check that did not run. The
+# refusal path still names an id the CALLER typed -- `block: c2` must say "c2" or the refusal is
+# unreadable -- and that is NOT_RUN_BY_THE_ACTION above, a different surface with its own test.
+#
+# The `skip-allowlist` input stays ACCEPTED so no existing workflow errors on upgrade, and an input
+# that silently does nothing is a lie, so every run still says it does nothing. Only the clause
+# naming the check was removed; the honesty the line exists for is untouched.
 SKIP_ALLOWLIST_INERT_LINE = ("The `skip-allowlist` input is accepted and INERT in this release: it is "
-                             "not read and selects nothing, because C2 is not run by the Action in "
-                             "this release.")
+                             "not read and selects nothing.")
 # The named receipt residual, IMPORTED from the core rather than retyped, so the owner's sentence of
 # 2026-09-08 exists in exactly one place: "a PR whose code and test are wrong IN AGREEMENT has no
 # deterministic oracle ... it is a NAMED RECEIPT RESIDUAL". The core also prints it
@@ -54,8 +57,7 @@ RESIDUAL_LINE = X7_RESIDUAL
 # Every standing sentence this release puts on every receipt, in order. Rendered once per surface:
 # the PR comment / step summary (render_markdown), the check-run text (entrypoint._summary_output),
 # and the receipt JSON (build_receipt's `notes`).
-STANDING_NOTES: tuple[str, ...] = (PRODUCT_SENTENCE, RESIDUAL_LINE, C2_FROZEN_LINE,
-                                   SKIP_ALLOWLIST_INERT_LINE)
+STANDING_NOTES: tuple[str, ...] = (PRODUCT_SENTENCE, RESIDUAL_LINE, SKIP_ALLOWLIST_INERT_LINE)
 
 # BLOCK-mode conclusions. Only PROVEN is ever `success`; UNPROVEN is never a block by itself
 # (owner's ruling); CRASHED / NOT_RUN block but are distinct from failure — a crash is never green.
