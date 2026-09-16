@@ -1,20 +1,17 @@
 # Corund — require the PR's new tests to fail on the old code.
 #
-# Runs C1 red-on-revert against the PR: it reverts the PR's non-test diff onto the base, runs the
+# Runs red-on-revert against the PR: it reverts the PR's non-test diff onto the base, runs the
 # PR's new/changed tests, and requires at least one to EXECUTE and FAIL BY ASSERTION on the reverted
 # tree, then pass again restored. It posts ONE check run, upserts ONE PR comment carrying the
 # receipt, and uploads the receipt JSON as an artifact.
 #
-# What C1 proves, and what it does not: it proves a test could have failed. It does NOT verify the
+# What red-on-revert proves, and what it does not: it proves a test could have failed. It does NOT verify the
 # test asserts the CORRECT value, so a PR whose code and test are wrong in agreement is NOT DECIDED.
 # That residual is printed on every receipt.
 #
-# C1 does not ACCUSE. Its verdicts are PROVEN, UNPROVEN with a named reason, CRASHED, and NOT_RUN.
+# Red-on-revert does not ACCUSE. Its verdicts are PROVEN, UNPROVEN with a named reason, CRASHED, and NOT_RUN.
 # The canonical fake green — a test that is green with the change reverted — is UNPROVEN
 # ("green-on-revert"), not an accusation; a skip is UNPROVEN ("collection").
-#
-# C2 skip-audit is experimental and observe-only: it is not run by this Action in this release, and
-# is available via `corund replay`.
 #
 # Absolute rule: Corund never reports a check it did not run. A check it could not run is posted
 # as NOT_RUN or CRASHED with the reason; an internal crash of this Action concludes every check it
@@ -41,7 +38,7 @@ inputs:
     required: false
     default: "python -m pytest"
   test-globs:
-    description: "Comma-separated globs that identify test files (everything else is the non-test diff C1 reverts)."
+    description: "Comma-separated globs that identify test files (everything else is the non-test diff the check reverts)."
     required: false
     default: "tests/**/test_*.py,**/test_*.py,**/*_test.py,**/*.test.js,**/*.test.ts,**/*.test.tsx,**/*.test.jsx,**/*.spec.ts,**/*.spec.js,**/__tests__/**"
   runner:
@@ -49,15 +46,15 @@ inputs:
     required: false
     default: "auto"
   skip-allowlist:
-    description: "ACCEPTED AND INERT in this release. The loud-skip allowlist is C2's input, and C2 is not run by this Action here, so this value is not read and selects nothing. The input is kept so an existing workflow does not error on upgrade, and every receipt states that it does nothing."
+    description: "ACCEPTED AND INERT in this release. This Action runs one check, red-on-revert, which does not read an allowlist. The value is accepted so an existing workflow keeps working, and it selects nothing."
     required: false
     default: "tests/loud_skips.txt"
   block:
-    description: "Comma list of check ids allowed to conclude failure. This release runs C1 only, so `c1` is the only accepted value; empty = OBSERVE. Any other id (including `c2`) is REFUSED with a message naming it — never accepted and ignored, because a gate the user believes is armed and is not is the exact defect Corund exists to catch."
+    description: "Comma list of check ids allowed to conclude failure. This release runs one check, so `c1` is the only accepted value; empty = OBSERVE. Any other id (including `c2`) is REFUSED with a message naming it — never accepted and ignored, because a gate the user believes is armed and is not is the exact defect Corund exists to catch."
     required: false
     default: ""
   timeout-minutes:
-    description: "Per test-run timeout for C1 (three runs at most: with, without, rerun)."
+    description: "Per test-run timeout for the check (three runs at most: with, without, rerun)."
     required: false
     default: "20"
   token:

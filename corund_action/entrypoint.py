@@ -91,7 +91,7 @@ class _Ctx:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(prog="corund", description="Corund — deterministic gate-integrity checks on a PR")
+    ap = argparse.ArgumentParser(prog="corund", description="Corund — require the PR's new tests to fail on the old code")
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run", help="run C1 red-on-revert on one pull request and post the receipt")
     r.add_argument("--repo-dir", default=".")

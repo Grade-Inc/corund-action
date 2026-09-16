@@ -27,17 +27,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0             # load-bearing: C1 needs the merge-base
+          fetch-depth: 0             # load-bearing: red-on-revert needs the merge-base
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install -e ".[dev]"    # whatever your test command needs
+      - run: pip install pytest          # test dependencies ONLY -- not the package itself
       - uses: Grade-Inc/corund-action@v0.1.3
         with:
+          runner: pytest
           test-command: python -m pytest
 ```
 
 That is the whole install. Nothing blocks: every check-run conclusion is `neutral` until you opt in.
+
+**Why `runner:` is named.** This release detects the runner from a config file (`pytest.ini`, `pyproject.toml`, `package.json`). A repository with tests and none of those has nothing to detect, so naming it is what keeps the paste block working on a bare repository; the next release reads the family from `test-command` and the line becomes optional.
 
 **Why each line is there.** `fetch-depth: 0` is not optional — with a shallow clone the base commit
 is not in the checkout, and Corund reports `NOT_RUN` saying so rather than guessing. The three
@@ -46,6 +49,14 @@ permissions are the three things the Action does: read the repository, post one 
 (`GET`/`POST`/`PATCH /repos/{owner}/{repo}/issues/{number}/comments`). It asks for nothing else.
 `test-command` defaults to `python -m pytest`; the jest and vitest families are supported too, and
 every other runner reports `NOT_RUN` naming the runner rather than passing.
+
+**Importing the code under test.** Corund takes your non-test diff back out in a *fresh worktree*,
+so the tests have to import your code **from that tree**. An editable install (`pip install -e .`)
+points at the original checkout, which is never reverted -- so every test that reads through one
+passes on the reverted tree and the verdict is `UNPROVEN`, however good the test is. A non-editable
+`pip install .` is the same trap: it copies your code into `site-packages` at head. Install your test
+*dependencies*, not the package under test. A flat layout is imported from the rootdir automatically;
+a `src/` layout needs `pythonpath = ["src"]` under `[tool.pytest.ini_options]`.
 
 **The pin.** `@v0.1.3` is a released tag, not a moving one. `@v0` is a floating major that is
 re-pointed on each release and `@main` is not a release at all; pin the exact version so the
@@ -74,10 +85,8 @@ a test whose assertion genuinely fails once the diff is reverted is `PROVEN` eve
 on is an unrelated constant the same diff touched. The receipt names the witness so you can read
 what it asserted.
 
-**What this release does not check.** C1 confirms that the test the pull request adds or changes
-catches that pull request's change. It does not flag a pull request that disables an existing test;
-that is the frozen check's job. Skip-audit (C2) is experimental and not run by the Action. Replay
-CLI only.
+**What this release does not check.** This release checks that new/changed tests fail on the old
+code. It does not flag a PR that only turns off an existing test.
 
 ## Posture: observe first
 
@@ -105,17 +114,17 @@ python3 corund_cli.py replay --repo-dir . --branch main --last 50 --run-tests \
     --out corund-replay.jsonl --report corund-replay.txt
 ```
 
-`--run-tests` is what makes C1 run: without it the revert-run is skipped and C1 reports `NOT_RUN`.
+`--run-tests` is what makes the check run: without it the revert-run is skipped and it reports `NOT_RUN`.
 Expect it to be slow — it runs your changed tests two or three times per pull request.
 
 What it prints, from a real run over a one-pull-request repository whose new test does fail on the
-old code. The report writes one row per check in the package; the C1 row is the one this release
-runs, and the rest of the report is elided here rather than retyped:
+old code. The report writes one row per check in the package; the red-on-revert row is the one this
+release runs, and the rest of the report is elided here rather than retyped:
 
 ```
 tree da4c69aaca091116351f4ed6afc36aeb0cef1903 — corund replay over 1 merged PR(s) of demo-repo
 [...]
-C1 red-on-revert: ran 1/1; would have flagged 0; PROVEN 1; UNPROVEN 0; NOT_RUN 0; CRASHED 0; marked true positive 0, false positive 0, unmarked 0; false positive rate n/a (nothing marked)
+red-on-revert: ran 1/1; would have flagged 0; PROVEN 1; UNPROVEN 0; NOT_RUN 0; CRASHED 0; marked true positive 0, false positive 0, unmarked 0; false positive rate n/a (nothing marked)
 [...]
 ```
 
@@ -128,7 +137,7 @@ set `block:` — that is the point of running it first.
 | input | default | meaning |
 |---|---|---|
 | `test-command` | `python -m pytest` | your runner; Corund appends the report flag and the changed test files |
-| `test-globs` | pytest + jest/vitest patterns | which changed files are tests; everything else is the non-test diff C1 reverts |
+| `test-globs` | pytest + jest/vitest patterns | which changed files are tests; everything else is the non-test diff the check reverts |
 | `runner` | `auto` | `pytest`, `jest`, `vitest`, or auto-detect; any other runner reports `NOT_RUN` |
 | `block` | (empty) | comma list of check ids allowed to conclude failure |
 | `timeout-minutes` | `20` | per test run (at most three: with, without, rerun) |
@@ -140,7 +149,7 @@ set `block:` — that is the point of running it first.
 command and exit code, and `internal_error` if the Action crashed. It is also uploaded as the
 `corund-receipt` artifact and rendered into the job summary and the pull-request comment.
 
-## How C1 actually works
+## How red-on-revert actually works
 
 1. `git diff --name-status --no-renames -z <merge-base> <head>`, split three ways by `test-globs`:
    test files, **test-infrastructure files** (conftest.py, pytest.ini, pyproject.toml, setup.cfg,
@@ -195,16 +204,15 @@ through one is green on the reverted tree.
 
 Corund speaks when your PR changes tests; on PRs that don't, it stays quiet.
 
-## Pricing
+## Licence
 
 **This Action is MIT-licensed and free.** Public repositories and private ones, observe mode or
-blocking — `block:` is an input in your own workflow file and nothing here checks a licence. It runs
-on your runners and reports to your repository.
+blocking -- `block:` is an input in your own workflow file and nothing here checks a licence. It
+runs on your runners, in your CI, and reports to your repository. There is no account, no key and
+no paid tier: this repository is the product.
 
-The paid product is the **hosted App** at [corund.dev](https://corund.dev/pricing), which is a
-different thing: Corund runs the checks and posts them itself, with organisation-wide enable,
-`policy.yml` enforcement, seats, and replay-gated enforcement. Current prices are on the pricing
-page.
+A managed, organisation-wide service is being built. It is not part of this release and is not for
+sale today; if you want it for your team, write to support@corund.dev.
 
 ## Layout
 

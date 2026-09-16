@@ -1,15 +1,16 @@
-"""corund_checks — the four deterministic checks Corund runs on a pull request, as pure functions
+"""corund_checks — the deterministic checks Corund runs on a pull request, as pure functions
 over input snapshots. No network, no git, no model judgment inside this package: callers build the
 snapshots (see checks/README.md for the exact keys) and `run_check` never raises.
 
-    C1 red-on-revert      C2 skip-audit      C3 gate-fold      C4 approval-SHA binding
+    red-on-revert — revert the pull request's non-test diff, run its new and changed tests,
+    require a failure; restore the diff, require a pass. The one check this release runs.
 
 Absolute rule: Corund never reports a check it did not run. CRASHED carries the
 exception's own text; NOT_RUN names the missing input; neither is ever PROVEN.
 
-NAMING, fixed 2026-09-09 after a production crash on app.corund.dev (`replay CRASHED` on the
-dashboard and onboarding, `TypeError: 'module' object is not callable`): `replay` below is the
-SUBMODULE (`checks/corund_checks/replay.py`), not the engine callable. `from . import replay`
+NAMING: `replay` below is the SUBMODULE (`checks/corund_checks/replay.py`), not the engine
+callable. Calling `corund_checks.replay(...)` as if it were the function calls the MODULE and
+raises `TypeError: 'module' object is not callable`. `from . import replay`
 binds the package attribute `replay` to the imported module object; that module's own top-level
 `def replay(items)` function lives at `replay.replay`, one dotted hop further in, exactly as
 `action/corund_action/replay_cli.py` (`from corund_checks import replay as engine`, then
@@ -38,7 +39,7 @@ run_replay = replay.replay
 ReplayItem = replay.ReplayItem
 ReplayRow = replay.ReplayRow
 
-__version__ = "0.1.0"
+__version__ = "0.1.3"
 
 __all__ = [
     "ALLOWED_STATES", "CHECK_IDS", "CHECK_NAMES", "FLAGGING_STATES", "INPUT_SCHEMA",
